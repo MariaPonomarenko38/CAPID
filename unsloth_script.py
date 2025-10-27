@@ -38,17 +38,18 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 
 model = FastLanguageModel.get_peft_model(
     model,
-    r = 16, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
-    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
-                      "gate_proj", "up_proj", "down_proj",],
-    lora_alpha = 16,
-    lora_dropout = 0, # Supports any, but = 0 is optimized
-    bias = "none",    # Supports any, but = "none" is optimized
-    # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
-    use_gradient_checkpointing = "unsloth", # True or "unsloth" for very long context
+    r = 32,  # ↑ was 16 — gives adapters enough capacity but still efficient
+    target_modules = [
+        "q_proj", "k_proj", "v_proj", "o_proj",
+        "gate_proj", "up_proj", "down_proj",
+    ],
+    lora_alpha = 32,     # match to r for balanced scaling
+    lora_dropout = 0.05, # small regularization to avoid memorization
+    bias = "none",
+    use_gradient_checkpointing = "unsloth",
     random_state = 3407,
-    use_rslora = False,  # We support rank stabilized LoRA
-    loftq_config = None, # And LoftQ
+    use_rslora = False,
+    loftq_config = None,
 )
 
 alpaca_prompt = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
@@ -85,7 +86,7 @@ def formatting_prompts_func(examples):
     return { "text" : texts, }
 
 from datasets import load_dataset
-with open("./data/train.jsonl", "r", encoding="utf-8") as f:
+with open("./data/new/train_permuted.jsonl", "r", encoding="utf-8") as f:
     data = [json.loads(line) for line in f]
 # Replace nested "piis" with comma-separated keys
 for sample in data:
@@ -119,7 +120,7 @@ trainer = SFTTrainer(
         gradient_accumulation_steps = 4,
 
         # Use epochs instead of steps:
-        num_train_epochs = 3,        # 👈 how many full passes over the dataset
+        num_train_epochs = 1,        # 👈 how many full passes over the dataset
         warmup_ratio = 0.03,         # 👈 fraction of total steps used for LR warmup (e.g., 3%)
 
         learning_rate = 2e-4,
@@ -136,7 +137,7 @@ trainer = SFTTrainer(
 
 trainer.train()
 
-SAVE_DIR = "models/context-pii-detection-qwen"
+SAVE_DIR = "models/context-pii-detection-qwen-3"
 trainer.model.save_pretrained(SAVE_DIR)
 tokenizer.save_pretrained(SAVE_DIR)
 print(f"✅ LoRA fine-tuned model saved to {SAVE_DIR}")

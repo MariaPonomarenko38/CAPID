@@ -4,9 +4,9 @@ from torch.utils.data import DataLoader
 from unsloth import FastLanguageModel
 
 # ========= CONFIG =========
-MODEL_NAME = "unsloth/Qwen3-8B-unsloth-bnb-4bit"
-TEST_PATH  = "./data/test.jsonl"
-SAVE_PATH  = "./data/predicted_pretrained.jsonl"
+MODEL_NAME = "unsloth/mistral-7b-instruct-v0.3-bnb-4bit"#"unsloth/Qwen3-1.7B-unsloth-bnb-4bit"#"unsloth/Qwen3-8B-unsloth-bnb-4bit"
+TEST_PATH  = "./data/new/test.jsonl"
+SAVE_PATH  = "./data/new/predicted_pretrained_mistral.jsonl"
 BATCH_SIZE = 4               # adjust based on VRAM
 MAX_NEW_TOKENS = 256         # realistic for JSON generation
 

@@ -2,7 +2,7 @@ import json
 from tqdm import tqdm
 
 # ========= CONFIG =========
-PRED_PATH = "./data/predicted_pretrained.jsonl"
+PRED_PATH = "./data/new/predicted_pretrained_mistral.jsonl"#"./data/new/predicted_pretrained_1.7B.jsonl"#"./data/new/predicted_finetuned.jsonl"
 
 # ========= HELPERS =========
 def flatten_gold(piis_dict):

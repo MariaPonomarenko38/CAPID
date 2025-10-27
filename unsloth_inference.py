@@ -4,7 +4,7 @@ from tqdm import tqdm
 import torch
 import re
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/Qwen3-8B-unsloth-bnb-4bit", # YOUR MODEL YOU USED FOR TRAINING
+    model_name = "models/context-pii-detection-qwen-3",#"unsloth/Qwen3-8B-unsloth-bnb-4bit", # YOUR MODEL YOU USED FOR TRAINING
     max_seq_length = 2048,
     dtype = None,
     load_in_4bit = True,
@@ -104,15 +104,15 @@ def extract_valid_pii_objects(text):
     return objs
 
 # ========= LOAD TEST DATA =========
-with open('./data/test.jsonl', "r", encoding="utf-8") as f:
+with open('./data/new/test.jsonl', "r", encoding="utf-8") as f:
     data = [json.loads(line) for line in f]
 
 # ========= GENERATE =========
-with open('./data/predicted_pretrained.jsonl', "w", encoding="utf-8") as fout:
+with open('./data/new/predicted_finetuned.jsonl', "w", encoding="utf-8") as fout:
     for sample in tqdm(data):
         # Build input
         input_str = alpaca_prompt.format(
-            instruction_pretrained,
+            instruction,
             sample["context"],
             sample["question"],
             "",
@@ -123,20 +123,26 @@ with open('./data/predicted_pretrained.jsonl', "w", encoding="utf-8") as fout:
 
         # Generate
         with torch.no_grad():
-            outputs = model.generate(**inputs, max_new_tokens=2048)
+            #outputs = model.generate(**inputs, max_new_tokens=2048)
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=512,
+                do_sample=False,
+                temperature=0.0,
+                repetition_penalty=1.1,
+            )
+            output_tokens = outputs[0][inputs['input_ids'].shape[1]:]
+            decoded = tokenizer.decode(output_tokens, skip_special_tokens=True).strip()
 
         # Decode full output
-        decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        #decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
         # Remove prompt prefix
         gen_only = extract_json_block(decoded)#decoded[len(input_str):].strip()
-        
-        print(gen_only)
 
         # Try parsing JSON
         parsed = try_parse_json(gen_only)
-        print(parsed)
-        print('+++++++')
+ 
 
         # Save result
         record = {
@@ -148,5 +154,6 @@ with open('./data/predicted_pretrained.jsonl', "w", encoding="utf-8") as fout:
             "parsed": parsed,
         }
         fout.write(json.dumps(record, ensure_ascii=False) + "\n")
+   
 
 print(f"\n✅ Saved all predictions")
