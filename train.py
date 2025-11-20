@@ -1,128 +1,143 @@
-import os
-import json
+from unsloth import FastLanguageModel
 import torch
-from datasets import load_dataset, Dataset
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    BitsAndBytesConfig,
-)
-from peft import (
-    LoraConfig,
-    get_peft_model,
-    prepare_model_for_kbit_training,
-)
-from trl import SFTTrainer, SFTConfig
+import json
+from datasets import Dataset
+max_seq_length = 2048 # Choose any! We auto support RoPE Scaling internally!
+dtype = None # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
+load_in_4bit = True # Use 4bit quantization to reduce memory usage. Can be False.
 
-# ==========================================================
-#                 BASIC CONFIGURATION
-# ==========================================================
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.3"
-DATA_PATH = "./data/formatted_pii_detection.jsonl"
-OUTPUT_DIR = "./mistral7b-lora-pii"
-BATCH_SIZE = 25
-GRAD_ACCUM_STEPS = 2
-LR = 2e-5
-EPOCHS = 1
+# 4bit pre quantized models we support for 4x faster downloading + no OOMs.
+fourbit_models = [
+    "unsloth/Meta-Llama-3.1-8B-bnb-4bit",      # Llama-3.1 2x faster
+    "unsloth/Meta-Llama-3.1-70B-bnb-4bit",
+    "unsloth/Mistral-Small-Instruct-2409",     # Mistral 22b 2x faster!
+    "unsloth/mistral-7b-instruct-v0.3-bnb-4bit",
+    "unsloth/Phi-3.5-mini-instruct",           # Phi-3.5 2x faster!
+    "unsloth/Phi-3-medium-4k-instruct",
+    "unsloth/gemma-2-27b-bnb-4bit",            # Gemma 2x faster!
 
-os.environ["WANDB_PROJECT"] = "context-aware-pii-detection"
-os.environ["WANDB_MODE"] = "online" 
+    "unsloth/Llama-3.2-1B-bnb-4bit",           # NEW! Llama 3.2 models
+    "unsloth/Llama-3.2-1B-Instruct-bnb-4bit",
+    "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
+] # More models at https://huggingface.co/unsloth
 
-# ==========================================================
-#                 LOAD DATASET
-# ==========================================================
-dataset = load_dataset("json", data_files=DATA_PATH)["train"]
+qwen_models = [
+    "unsloth/Qwen3-14B-unsloth-bnb-4bit",      # Qwen 14B 2x faster
+    "unsloth/Qwen3-8B-unsloth-bnb-4bit",
+    "unsloth/Qwen3-0.6B-unsloth-bnb-4bit",
+    "unsloth/Qwen3-1.7B-unsloth-bnb-4bit",
+] # More models at https://huggingface.co/unsloth
 
-def format_example(ex):
-    return {"text": ex["prompt"] + " " + ex["completion"]}
-
-dataset = dataset.map(format_example, remove_columns=dataset.column_names)
-
-# ==========================================================
-#                 LOAD TOKENIZER
-# ==========================================================
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.eos_token
-
-# ==========================================================
-#                 LOAD BASE MODEL (4-bit)
-# ==========================================================
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_compute_dtype=torch.bfloat16,
-    bnb_4bit_use_double_quant=True,
-    bnb_4bit_quant_type="nf4",
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",#"unsloth/Meta-Llama-3.1-8B-bnb-4bit", #"unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
+    max_seq_length = max_seq_length,
+    dtype = dtype,
+    load_in_4bit = load_in_4bit,
+    # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
 
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME,
-    quantization_config=bnb_config,
-    device_map="auto",
-)
-
-# ==========================================================
-#                 PREPARE FOR LORA TRAINING
-# ==========================================================
-model = prepare_model_for_kbit_training(model)
-
-
-lora_config = LoraConfig(
-    r=64,                      # rank of LoRA adapters
-    lora_alpha=128,             # scaling factor
-    target_modules=[
+model = FastLanguageModel.get_peft_model(
+    model,
+    r = 32,  # ↑ was 16 — gives adapters enough capacity but still efficient
+    target_modules = [
         "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj", "lm_head"
-        
-    ],  # efficient choice for Mistral
-    lora_dropout=0.05,
-    bias="none",
-    task_type="CAUSAL_LM",
+        "gate_proj", "up_proj", "down_proj",
+    ],
+    lora_alpha = 32,     # match to r for balanced scaling
+    lora_dropout = 0.05, # small regularization to avoid memorization
+    bias = "none",
+    use_gradient_checkpointing = "unsloth",
+    random_state = 3407,
+    use_rslora = False,
+    loftq_config = None,
 )
 
-model = get_peft_model(model, lora_config)
-for name, param in model.named_parameters():
-    if param.requires_grad:
-        print(name)
+alpaca_prompt = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
 
-# ==========================================================
-#                 TRAINING CONFIGURATION
-# ==========================================================
-sft_config = SFTConfig(
-    output_dir=OUTPUT_DIR,
-    max_length=2048,
-    num_train_epochs=EPOCHS,
-    per_device_train_batch_size=BATCH_SIZE,
-    gradient_accumulation_steps=GRAD_ACCUM_STEPS,
-    learning_rate=LR,
-    warmup_ratio=0.03,
-    logging_steps=10,
-    save_strategy="epoch",
-    dataset_text_field="text",
-    optim="paged_adamw_32bit",
-    bf16=True,
-    packing=False,
-)
+### Instruction:
+{}
 
-# ==========================================================
-#                 TRAINER SETUP
-# ==========================================================
+### Input:
+Text: {}
+Question: {}
+
+### Response:
+{}"""
+
+EOS_TOKEN = tokenizer.eos_token # Must add EOS_TOKEN
+def formatting_prompts_func(examples):
+    instructions = [
+        """You are given the text and the question.
+        Find all PIIs (Personally Identifiable Information) in the text and output them separated by commas.
+        Classify them into one of the following types: health, location, sexual orientation, occupation, age, belief, relationship, name, education, appearance, code, organization, finance, datetime, demographic.
+        Classify their relevance to the question: high, low.
+        Output result in the JSON format.
+        """
+    ] * len(examples["context"])
+
+    inputs_contexts = examples["context"]
+    inputs_questions = examples["question"]
+    outputs = examples["piis"]
+    texts = []
+    for instruction, input_c, input_q, output in zip(instructions, inputs_contexts,inputs_questions, outputs):
+        # Must add EOS_TOKEN, otherwise your generation will go on forever!
+        text = alpaca_prompt.format(instruction, input_c, input_q, output) + EOS_TOKEN
+        texts.append(text)
+    return { "text" : texts, }
+
+from datasets import load_dataset
+with open("./data/train.jsonl", "r", encoding="utf-8") as f:
+    data = [json.loads(line) for line in f]
+
+for sample in data:
+    piis = sample.get("piis", {})
+    if isinstance(piis, dict):
+        for pii_name, pii_info in list(piis.items()):
+            if isinstance(pii_info, dict) and "location" in pii_info:
+                del pii_info["location"]   
+        sample["piis"] = piis
+
+# --- Optionally replace 'piis' with comma-separated keys ---
+for sample in data:
+    if isinstance(sample.get("piis"), dict):
+        sample["piis"] = json.dumps(sample["piis"])
+    else:
+        sample["piis"] = ""
+
+dataset = Dataset.from_list(data)
+dataset = dataset.map(formatting_prompts_func, batched = True,)
+
+
+from trl import SFTConfig, SFTTrainer
 trainer = SFTTrainer(
-    model=model,
-    processing_class=tokenizer,
-    train_dataset=dataset,
-    args=sft_config,
-    
-)
+    model = model,
+    tokenizer = tokenizer,
+    train_dataset = dataset,
+    dataset_text_field = "text",
+    max_seq_length = max_seq_length,
+    args = SFTConfig(
+        per_device_train_batch_size = 2,
+        gradient_accumulation_steps = 4,
 
-# ==========================================================
-#                 TRAINING
-# ==========================================================
+        # Use epochs instead of steps:
+        num_train_epochs = 2,        # 👈 how many full passes over the dataset
+        warmup_ratio = 0.03,         # 👈 fraction of total steps used for LR warmup (e.g., 3%)
+
+        learning_rate = 2e-4,
+        logging_steps = 10,
+
+        optim = "adamw_8bit",
+        weight_decay = 0.01,
+        lr_scheduler_type = "linear",
+
+        seed = 3407,
+        output_dir = "outputs",
+        report_to = "none",          # use "wandb" if you want to log to Weights & Biases
+    ))
+
 trainer.train()
 
-# ==========================================================
-#                 SAVE MODEL
-# ==========================================================
-trainer.model.save_pretrained(OUTPUT_DIR)
-tokenizer.save_pretrained(OUTPUT_DIR)
-print(f"✅ LoRA fine-tuned model saved to {OUTPUT_DIR}")
+SAVE_DIR = "models/context-pii-detection-Llama-3.2-3B"
+trainer.model.save_pretrained(SAVE_DIR)
+tokenizer.save_pretrained(SAVE_DIR)
+print(f"✅ LoRA fine-tuned model saved to {SAVE_DIR}")
