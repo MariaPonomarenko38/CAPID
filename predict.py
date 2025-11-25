@@ -5,7 +5,8 @@ import torch
 from transformers import AutoTokenizer
 import re
 
-MODEL_NAME = "/root/context/models/context-pii-detection-Llama-3.1-8B"
+MODEL_NAME = "/u4/m2ponoma/context/models/v1/context-pii-detection-Llama-3.2-3B-v1"
+#MODEL_NAME = "ponoma16/context-pii-detection-Llama-3.1-8B"
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = MODEL_NAME, #"unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit", # YOUR MODEL YOU USED FOR TRAINING
     max_seq_length = 2048,
@@ -109,8 +110,9 @@ def extract_valid_pii_objects(text):
             continue
     return objs
 
-context = """I applied for extension of visitor record June 16, a month before expiry, address in Ontario. Still processing to date."""
-question = "Do I need to prepare any document if I go visit Calgary?"
+context = """i’m pretty sure i have a severe coffee addiction. i start my day off with an iced coffee and always add extra instant coffee on top of my shot.
+there was one day where i was in a rush in the morning and skipped my morning coffee - got a terrible migraine."""
+question = """What can i do in order to feel better?"""
 input_str = alpaca_prompt.format(
     instruction,
     context,
@@ -126,10 +128,11 @@ with torch.no_grad():
     #outputs = model.generate(**inputs, max_new_tokens=2048)
     outputs = model.generate(
         **inputs,
-        max_new_tokens=512,
+        max_new_tokens=2048,
         do_sample=False,
         temperature=0.0,
-        repetition_penalty=1.1,
+        top_p=1.0,
+        #repetition_penalty=1.1,
     )
     output_tokens = outputs[0][inputs['input_ids'].shape[1]:]
     decoded = tokenizer.decode(output_tokens, skip_special_tokens=True).strip()

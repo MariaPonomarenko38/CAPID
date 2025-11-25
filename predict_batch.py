@@ -4,11 +4,11 @@ from torch.utils.data import DataLoader
 from unsloth import FastLanguageModel
 from transformers import AutoTokenizer
 # ========= CONFIG =========
-MODEL_NAME = "/root/context/models/context-pii-detection-Llama-3.2-3B"#"/root/context/models/context-pii-detection-Llama-3.1-8B"#"unsloth/Llama-3.2-3B-Instruct"#"unsloth/Qwen3-1.7B-unsloth-bnb-4bit"#"unsloth/Qwen3-8B-unsloth-bnb-4bit"
-TEST_PATH  = "./data/test.jsonl"
-SAVE_PATH  = "./data/predicted_finetuned_llama_3b.jsonl"
+MODEL_NAME = "/u4/m2ponoma/context/models/v1/context-pii-detection-Llama-3.1-8B-v1"#"/root/context/models/context-pii-detection-Llama-3.1-8B"#"unsloth/Llama-3.2-3B-Instruct"#"unsloth/Qwen3-1.7B-unsloth-bnb-4bit"#"unsloth/Qwen3-8B-unsloth-bnb-4bit"
+TEST_PATH  = "./data/reddit.jsonl"
+SAVE_PATH  = "./data/predicted_reddit_8b_1.jsonl"
 BATCH_SIZE = 4               # adjust based on VRAM
-MAX_NEW_TOKENS = 256         # realistic for JSON generation
+MAX_NEW_TOKENS = 2048#256         # realistic for JSON generation
 
 # ========= LOAD MODEL =========
 model, tokenizer = FastLanguageModel.from_pretrained(

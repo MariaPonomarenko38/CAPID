@@ -2,7 +2,7 @@ import json
 from tqdm import tqdm
 
 # ========= CONFIG =========
-PRED_PATH = "./data/predicted_finetuned_llama_3b.jsonl"#"./data/new/predicted_pretrained_1.7B.jsonl"#"./data/new/predicted_finetuned.jsonl"
+PRED_PATH = "./data/predicted_reddit_3b.jsonl"#"./data/v1/predicted_finetuned_llama_8b.jsonl"#"./data/new/predicted_pretrained_1.7B.jsonl"#"./data/new/predicted_finetuned.jsonl"
 
 # ========= HELPERS =========
 

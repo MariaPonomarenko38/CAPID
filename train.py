@@ -29,7 +29,7 @@ qwen_models = [
 ] # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",#"unsloth/Meta-Llama-3.1-8B-bnb-4bit", #"unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
+    model_name = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
     max_seq_length = max_seq_length,
     dtype = dtype,
     load_in_4bit = load_in_4bit,
@@ -86,7 +86,7 @@ def formatting_prompts_func(examples):
     return { "text" : texts, }
 
 from datasets import load_dataset
-with open("./data/train.jsonl", "r", encoding="utf-8") as f:
+with open("./data/v1/train.jsonl", "r", encoding="utf-8") as f:
     data = [json.loads(line) for line in f]
 
 for sample in data:
@@ -137,7 +137,7 @@ trainer = SFTTrainer(
 
 trainer.train()
 
-SAVE_DIR = "models/context-pii-detection-Llama-3.2-3B"
+SAVE_DIR = "models/v1/context-pii-detection-Llama-3.2-3B-v1"
 trainer.model.save_pretrained(SAVE_DIR)
 tokenizer.save_pretrained(SAVE_DIR)
 print(f"✅ LoRA fine-tuned model saved to {SAVE_DIR}")
