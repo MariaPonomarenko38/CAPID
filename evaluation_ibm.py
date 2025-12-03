@@ -33,15 +33,16 @@ analyzer = PrivacyAnalyzer(
 results = []
 
 def convert_prediction(result):
+    #print(result)
     pred_tuples = []
 
     # related_context → high relevance
     for span in result.get("related_context", []):
-        pred_tuples.append((span, None, "high"))
+        pred_tuples.append((span, None, "1"))
 
     # not_related_context → low relevance
     for span in result.get("not_related_context", []):
-        pred_tuples.append((span, None, "low"))
+        pred_tuples.append((span, None, "0"))
 
     return pred_tuples
 
@@ -51,24 +52,42 @@ def extract_gold(entry):
 
 results = []
 
-with open("./data/test.jsonl", "r") as f:
-    for line in tqdm(f, desc="Evaluating dataset"):
+input_path = "./data/reddit.jsonl"
+output_path = f"./data/ibm_test_results_llama_3b.jsonl"
+
+with open(input_path, "r", encoding="utf-8") as fin, \
+    open(output_path, "w", encoding="utf-8") as fout:
+
+    for line in tqdm(fin, desc="Evaluating dataset"):
         entry = json.loads(line)
 
+        # Run the model
         result = run_single_query(
             query_text=entry["context"] + " " + entry["question"],
-            query_id=entry["id"],
             model=model,
+            query_id="001",
             prompt_template="llama",
             experiment="dynamic"
         )
-
+        #print(result)
+        # Convert & evaluate
         pred = convert_prediction(result)
         gold = extract_gold(entry)
-
         scores = compute_scores1(pred, gold)
-        scores["id"] = entry["id"]
         results.append(scores)
+
+        # Make the record to store
+        record = {
+            "context": entry["context"],
+            "question": entry["question"],
+            "pred": pred,
+            "gold": gold,
+            "reformulated_text": result['reformulated_text'],
+            "scores": scores
+        }
+
+        # Write one JSON object per line
+        fout.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 # Aggregate results
 def avg(key):
