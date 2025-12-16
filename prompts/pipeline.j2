@@ -1,0 +1,66 @@
+{% block situation %}
+Topic: {{ topic }}
+Subtopic: {{ subtopic }}
+PIIs:
+{{ pii_type1 }} - {{ pii_value1 }}
+{{ pii_type2 }} - {{ pii_value2 }}
+
+Generate exactly one natural-sounding sentence that:
+1. Describes a realistic situation connected to the given topic and subtopic.
+2. Include PIIs in the text exactly in the format they are. Do not change them.
+3. It should describe a problem.
+4. Use "I" and make it sound like a personal experience.
+5. Be specific — include at least one additional detail that makes the situation vivid 
+(e.g., time, reason, feeling, or other context clues).
+6. Keep the sentence between 20–35 words.
+{% endblock %}
+
+{% block question_1 %}
+You are given a short description of a situation. Your task is to generate a general question.
+Analyze the topic of the issue in the situation. Generate a general question on that topic.
+Question should not contain words {{ pii_value1 }} and {{ pii_value2 }} as well as their rephrased forms.
+Situation: {{ situation }}
+{% endblock %}
+
+{% block question_2 %}
+Make the provided question sound more personal. Rewrite with using 'I'.
+Question: {{ intermediate_question }}
+{% endblock %}
+
+{% block question_3 %}
+You are given the question.
+
+{% for c in high_piis %}
+Remove all the words that are related to {{ c }}
+{% endfor %}
+Question: {{ question }}
+Output just the modified question.
+
+{% endblock %}
+
+{% block peripheral_context %}
+Generate some facts about the person.
+They should be completely unrelated to the following text {{ topic }} - {{ subtopic }}.
+They should be about an unrelated subject.
+
+The facts MUST include these private info (PIIs) exactly as written:
+{{ low_relevant_piis }}
+
+These PIIs must appear in the text unchanged and in original exact form.
+Write one natural-sounding first-person sentence using "I", 20-25 words in plain-text.
+{% endblock %}
+
+{% block context_optimization %}
+Rewrite this text so it sounds coherent.
+Should be first-person.
+Pay attention at how sentences start and how they are connected with each other.
+Text: {{ context }}
+Do not change spelling of these words: {{ piis }}
+Output just modified text.
+{% endblock %}
+
+{% block pii_fix %}
+Find a span in the text that is the most similar to '{{ pii }}'.
+Text: {{ context }}
+Output just a span in its original form.
+{% endblock %}

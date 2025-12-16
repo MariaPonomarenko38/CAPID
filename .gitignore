@@ -1,3 +1,5 @@
 /models
 /outputs
 /unsloth_compiled_cache
+.env
+/src/capid.egg-info
