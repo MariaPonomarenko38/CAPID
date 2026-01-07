@@ -3,3 +3,5 @@
 /unsloth_compiled_cache
 .env
 /src/capid.egg-info
+/training/__pycache__
+/training/unsloth_compiled_cache

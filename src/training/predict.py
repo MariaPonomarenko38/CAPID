@@ -108,6 +108,7 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, required=True, )
     parser.add_argument("--input_path", type=str, required=True, )
     parser.add_argument("--save_path",type=str,)
+    parser.add_argument("--finetuning",type=bool,default=True)
 
     args = parser.parse_args()
     main(args)

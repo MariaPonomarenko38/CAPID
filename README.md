@@ -7,10 +7,10 @@ This repository contains code for working with **CAPID**, a dataset and pipeline
 
 ### 1. Create a Conda environment
 
-We recommend using **Python 3.10**.
+We recommend using **Python 3.11**.
 
 ```bash
-conda create -n capid-env python=3.10
+conda create -n capid-env python=3.11
 conda activate capid-env
 ```
 ### 2. Install the package
@@ -48,3 +48,9 @@ data/reddit.jsonl
 ```
 
 These files are used for training and evaluation, respectively.
+
+## Try out prediction model
+
+```bash
+python src/training/predict.py --model_name ponoma16/capid-llama8b-lora --input_path data/input.jsonl --save_path data/predictions.jsonl
+```
